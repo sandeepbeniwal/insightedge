@@ -154,4 +154,5 @@ object SchemaInference {
     */
   def getTypeTokenFromClassName(clazz: String): TypeToken[_] = TypeToken.of(Utils.classForName(clazz))
 
+
 }
