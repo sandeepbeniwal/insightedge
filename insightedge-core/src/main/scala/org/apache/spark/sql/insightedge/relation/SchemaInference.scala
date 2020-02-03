@@ -48,7 +48,7 @@ object SchemaInference {
   case class Schema(dataType: DataType, nullable: Boolean)
 
   /**
-    * @param clazz          class from which the shema will be inferred
+    * @param clazz          class from which the schema will be inferred
     * @return datatype for a class
     */
   def schemaFor(clazz: Class[_]): Schema = {
@@ -104,6 +104,7 @@ object SchemaInference {
       case t if t <:< localTypeOf[java.lang.Short] => Schema(ShortType, nullable = true)
       case t if t <:< localTypeOf[java.lang.Byte] => Schema(ByteType, nullable = true)
       case t if t <:< localTypeOf[java.lang.Boolean] => Schema(BooleanType, nullable = true)
+//      case t if t <:< localTypeOf[java.lang.Object] => Schema(ObjectType(t.getClass), nullable = false)
       case t if t <:< definitions.IntTpe => Schema(IntegerType, nullable = false)
       case t if t <:< definitions.LongTpe => Schema(LongType, nullable = false)
       case t if t <:< definitions.DoubleTpe => Schema(DoubleType, nullable = false)
@@ -114,7 +115,7 @@ object SchemaInference {
       case t if definedByConstructorParams(t) =>
         val params = getConstructorParameters(t)
         Schema(StructType(
-          params.map { case (fieldName, fieldType) =>
+          params.map { case (fieldName, fieldType)  =>
             val Schema(dataType, nullable) = schemaFor(fieldType)
             StructField(fieldName, dataType, nullable)
           }), nullable = true)

@@ -227,6 +227,10 @@ class DataFrameCreateSpec extends fixture.FlatSpec with InsightEdge {
     ))
     val spark = ie.spark
     val df = spark.read.grid(collectionName)
+    df.printSchema()
+    df.show()
+    df.explain()
+
     assert(df.count() == 2)
     assert(df.schema.fields.length == 0)
   }
