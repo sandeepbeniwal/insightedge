@@ -232,7 +232,7 @@ class DataFrameCreateSpec extends fixture.FlatSpec with InsightEdge {
     df.explain()
 
     assert(df.count() == 2)
-    assert(df.schema.fields.length == 0)
+    assert(df.schema.fields.length == 1) // should only add the default _spaceId field even when there are no fixed properties
   }
 
 }

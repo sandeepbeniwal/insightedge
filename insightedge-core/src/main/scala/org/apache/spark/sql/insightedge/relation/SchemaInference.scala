@@ -19,6 +19,7 @@ package org.apache.spark.sql.insightedge.relation
 import java.beans.Introspector
 
 import com.google.common.reflect.TypeToken
+import javax.activation.UnsupportedDataTypeException
 import org.apache.spark.sql.catalyst.ScalaReflection._
 import org.apache.spark.sql.types.{StructType, _}
 import org.apache.spark.util.Utils
@@ -103,8 +104,8 @@ object SchemaInference {
       case t if t <:< localTypeOf[java.lang.Float] => Schema(FloatType, nullable = true)
       case t if t <:< localTypeOf[java.lang.Short] => Schema(ShortType, nullable = true)
       case t if t <:< localTypeOf[java.lang.Byte] => Schema(ByteType, nullable = true)
+      case t if t =:= localTypeOf[java.lang.Object] => throw new UnsupportedDataTypeException("No schema for java.lang.Object")
       case t if t <:< localTypeOf[java.lang.Boolean] => Schema(BooleanType, nullable = true)
-//      case t if t <:< localTypeOf[java.lang.Object] => Schema(ObjectType(t.getClass), nullable = false)
       case t if t <:< definitions.IntTpe => Schema(IntegerType, nullable = false)
       case t if t <:< definitions.LongTpe => Schema(LongType, nullable = false)
       case t if t <:< definitions.DoubleTpe => Schema(DoubleType, nullable = false)
@@ -114,11 +115,11 @@ object SchemaInference {
       case t if t <:< definitions.BooleanTpe => Schema(BooleanType, nullable = false)
       case t if definedByConstructorParams(t) =>
         val params = getConstructorParameters(t)
-        Schema(StructType(
-          params.map { case (fieldName, fieldType)  =>
-            val Schema(dataType, nullable) = schemaFor(fieldType)
-            StructField(fieldName, dataType, nullable)
-          }), nullable = true)
+          Schema(StructType(
+            params.map { case (fieldName, fieldType)  =>
+              val Schema(dataType, nullable) = schemaFor(fieldType)
+              StructField(fieldName, dataType, nullable)
+            }), nullable = true)
       case other =>
         // assume the given type is a java type
         val typeToken = getTypeTokenFromClassName(className)
