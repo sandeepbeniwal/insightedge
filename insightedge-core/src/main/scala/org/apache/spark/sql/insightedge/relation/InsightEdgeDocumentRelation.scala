@@ -45,19 +45,15 @@ private[insightedge] case class InsightEdgeDocumentRelation(
 
   private def getStructType(collection : String): StructType = {
     val typeDescriptor = gs.getTypeManager.getTypeDescriptor(collection)
-    if (typeDescriptor == null) { throw new NoSuchElementException("Couldn't find a collection in memory")}
+    if (typeDescriptor == null) { throw new IllegalArgumentException("Couldn't find a collection in memory")}
 
     val properties = typeDescriptor.getPropertiesNames
     var structType = new StructType()
 
-    for (a <- properties) {
-      val property: SpacePropertyDescriptor = typeDescriptor.getFixedProperty(a)
-
-      if (property.getType == classOf[Object]) {
-        throw new UnsupportedDataTypeException("Reading java.lang.Object field: '" + property.getName + "' is not supported")
-      }
-      val schemaInference = SchemaInference.schemaFor(property.getType)
-      structType = structType.add(property.getName, schemaInference.dataType, schemaInference.nullable)
+    for (property <- properties) {
+      val propertyDescriptor: SpacePropertyDescriptor = typeDescriptor.getFixedProperty(property)
+      val schemaInference = SchemaInference.schemaFor(propertyDescriptor.getType)
+      structType = structType.add(propertyDescriptor.getName, schemaInference.dataType, schemaInference.nullable)
     }
     structType
   }

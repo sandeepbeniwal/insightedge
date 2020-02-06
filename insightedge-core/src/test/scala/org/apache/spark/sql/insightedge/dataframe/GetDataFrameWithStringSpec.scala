@@ -15,12 +15,9 @@ class GetDataFrameWithStringSpec extends fixture.FlatSpec with InsightEdge {
     writeDataSeqToDataGrid(1000)
     val spark= ie.spark
     val df = spark.read.grid("org.insightedge.spark.rdd.Data")
-
     val fields = classTag[Data].runtimeClass.getDeclaredFields
 
     // Make sure all the original fields exist.
-    // id is auto generated and shouldn't be seen therefore he has been filtered.
-    // (when you write read df, the auto generated id property is hidden)
     assert(fields.size == df.schema.fields.length, "Dataframe should have exactly the number of fields as the class it represents")
     for (field <- fields) {
       assert(df.schema.fieldNames.contains(field.getName))
@@ -35,8 +32,6 @@ class GetDataFrameWithStringSpec extends fixture.FlatSpec with InsightEdge {
     val fields = classTag[Data].runtimeClass.getDeclaredFields
 
     // Make sure all the original fields exist.
-    // id is auto generated and shouldn't be seen therefore he has been filtered.
-    // (when you write read df, the auto generated id property is hidden)
     assert(fields.size == df.schema.fields.length, "Dataframe should have exactly the number of fields as the class it represents")
     for (field <- fields) {
       assert(df.schema.fieldNames.contains(field.getName))

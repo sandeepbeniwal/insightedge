@@ -104,7 +104,6 @@ object SchemaInference {
       case t if t <:< localTypeOf[java.lang.Float] => Schema(FloatType, nullable = true)
       case t if t <:< localTypeOf[java.lang.Short] => Schema(ShortType, nullable = true)
       case t if t <:< localTypeOf[java.lang.Byte] => Schema(ByteType, nullable = true)
-      case t if t =:= localTypeOf[java.lang.Object] => throw new UnsupportedDataTypeException("No schema for java.lang.Object")
       case t if t <:< localTypeOf[java.lang.Boolean] => Schema(BooleanType, nullable = true)
       case t if t <:< definitions.IntTpe => Schema(IntegerType, nullable = false)
       case t if t <:< definitions.LongTpe => Schema(LongType, nullable = false)
@@ -125,7 +124,7 @@ object SchemaInference {
         val typeToken = getTypeTokenFromClassName(className)
         val rawType = typeToken.getRawType
         val declaredFields = typeToken.getRawType.getDeclaredFields
-        if (rawType.getSuperclass.getName.equals("java.lang.Enum")) {
+        if (rawType.getSuperclass != null && rawType.getSuperclass.getName.equals("java.lang.Enum")) {
           val fields = Array(StructField("name", StringType))
           Schema(StructType(fields), nullable = true)
         } else {

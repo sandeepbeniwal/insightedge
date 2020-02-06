@@ -29,7 +29,7 @@ import org.apache.spark.sql.insightedge.filter.{GeoContains, GeoIntersects, GeoW
 import org.apache.spark.sql.insightedge.relation.InsightEdgeAbstractRelation._
 import org.apache.spark.sql.insightedge.udt._
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.{StructField, StructType, UserDefinedType}
+import org.apache.spark.sql.types.{StructType, UserDefinedType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 import org.apache.spark.util.Utils
 import org.insightedge.spark.context.InsightEdgeConfig
