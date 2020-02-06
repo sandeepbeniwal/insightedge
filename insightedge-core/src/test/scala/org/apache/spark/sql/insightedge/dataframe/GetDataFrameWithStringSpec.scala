@@ -16,10 +16,7 @@ class GetDataFrameWithStringSpec extends fixture.FlatSpec with InsightEdge {
     val spark= ie.spark
     val df = spark.read.grid("org.insightedge.spark.rdd.Data")
 
-    //    val df = spark.read.format("org.apache.spark.sql.insightedge").load("org.insightedge.spark.rdd.Data")
     val fields = classTag[Data].runtimeClass.getDeclaredFields
-    df.show()
-    df.printSchema()
 
     // Make sure all the original fields exist.
     // id is auto generated and shouldn't be seen therefore he has been filtered.
@@ -34,12 +31,8 @@ class GetDataFrameWithStringSpec extends fixture.FlatSpec with InsightEdge {
 
     writeDataSeqToDataGrid(1000)
     val spark= ie.spark
-    spark.read.grid[Data]
-    val df = spark.read.format("org.apache.spark.sql.insightedge").option("class", classTag[Data].runtimeClass.getName).load()
-
+    val df = spark.read.grid[Data]
     val fields = classTag[Data].runtimeClass.getDeclaredFields
-    df.show()
-    df.printSchema()
 
     // Make sure all the original fields exist.
     // id is auto generated and shouldn't be seen therefore he has been filtered.

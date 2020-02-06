@@ -116,7 +116,7 @@ object SchemaInference {
       case t if definedByConstructorParams(t) =>
         val params = getConstructorParameters(t)
           Schema(StructType(
-            params.map { case (fieldName, fieldType)  =>
+            params.map { case (fieldName, fieldType) =>
               val Schema(dataType, nullable) = schemaFor(fieldType)
               StructField(fieldName, dataType, nullable)
             }), nullable = true)
@@ -154,6 +154,4 @@ object SchemaInference {
     * Returns the type token for a class name.
     */
   def getTypeTokenFromClassName(clazz: String): TypeToken[_] = TypeToken.of(Utils.classForName(clazz))
-
-
 }
