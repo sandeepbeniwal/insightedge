@@ -83,7 +83,9 @@ class DataFrameNestedQuerySpec extends fixture.FlatSpec with InsightEdge {
     val collectionName = randomString()
     val spark = ie.spark
     spark.read.grid[Person].write.grid(collectionName)
-
+    val df2 = spark.read.grid(collectionName)
+    df2.printSchema()
+    df2.show()
     val person = ie.spaceProxy.read(new SQLQuery[SpaceDocument](collectionName, ""))
     assert(person.getProperty[Any]("address").isInstanceOf[DocumentProperties])
     assert(person.getProperty[Any]("age").isInstanceOf[Integer])

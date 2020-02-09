@@ -10,7 +10,7 @@ import scala.reflect.classTag
 
 class GetDataFrameWithStringSpec extends fixture.FlatSpec with InsightEdge {
 
-  it should "Read data frame as String with a valid struct Type " taggedAs ScalaSpaceClass in { ie =>
+  it should "Read data frame as String which was written as POJO with a valid struct Type " taggedAs ScalaSpaceClass in { ie =>
 
     writeDataSeqToDataGrid(1000)
     val spark= ie.spark
@@ -24,7 +24,7 @@ class GetDataFrameWithStringSpec extends fixture.FlatSpec with InsightEdge {
     }
   }
 
-  it should "Read data frame as Class with a valid struct Type " taggedAs ScalaSpaceClass in { ie =>
+  it should "Read data frame as Class which was written as POJO with a valid struct Type " taggedAs ScalaSpaceClass in { ie =>
 
     writeDataSeqToDataGrid(1000)
     val spark= ie.spark

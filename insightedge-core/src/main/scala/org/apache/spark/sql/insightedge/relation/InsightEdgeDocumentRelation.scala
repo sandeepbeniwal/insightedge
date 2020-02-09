@@ -36,18 +36,19 @@ private[insightedge] case class InsightEdgeDocumentRelation(
                                                           )
   extends InsightEdgeAbstractRelation(context, options) with Serializable {
 
+  private val DATAFRAME_ID_PROPERTY = "i9e_DfId"
+
   lazy val inferredSchema: StructType = {
-    gs.read[DataFrameSchema](new IdQuery(classOf[DataFrameSchema], collection)) match {
-      case null => getStructType(collection)
-      case storedSchema => storedSchema.schema
-    }
+    getStructType(collection)
   }
 
   private def getStructType(collection : String): StructType = {
     val typeDescriptor = gs.getTypeManager.getTypeDescriptor(collection)
     if (typeDescriptor == null) { throw new IllegalArgumentException("Couldn't find a collection in memory")}
 
-    val properties = typeDescriptor.getPropertiesNames
+    // We don't want to return id field when reading Dataframe, which was written to space as Dataframe.
+    val properties = typeDescriptor.getPropertiesNames.filterNot(property => property.contains(DATAFRAME_ID_PROPERTY))
+
     var structType = new StructType()
 
     for (property <- properties) {
@@ -124,6 +125,23 @@ private[insightedge] case class InsightEdgeDocumentRelation(
     val rdd = new InsightEdgeDocumentRDD(ieConfig, sc, collection, query, params, fields.toSeq, options.readBufferSize)
 
     rdd.mapPartitions { data => InsightEdgeAbstractRelation.beansToRows(data, clazzName, schema, fields) }
+  }
+
+
+  private def dataTypeClassRepresentation(dataType: DataType): String = {
+    val firstChar = dataType.typeName.charAt(0)
+    val upperFirstChar = firstChar.toUpper
+
+    "java.lang." + dataType.typeName.replaceFirst(firstChar.toString, upperFirstChar.toString)
+  }
+
+  private def addFixedProperties(stdb: SpaceTypeDescriptorBuilder, properties: Map[String, String]): SpaceTypeDescriptorBuilder = {
+    var newSpaceTypeDescriptorBuilder = stdb
+
+    for ((k,v) <- properties) {
+      newSpaceTypeDescriptorBuilder = stdb.addFixedProperty(k,v)
+    }
+    newSpaceTypeDescriptorBuilder
   }
 
 }
