@@ -142,6 +142,8 @@ class DataFrameCreateSpec extends fixture.FlatSpec with InsightEdge {
   }
 
   it should "load dataframe from existing space documents with provided schema" in { ie =>
+    turnNestedDFFlagOn()
+
     val collectionName = randomString()
 
     ie.spaceProxy.getTypeManager.registerTypeDescriptor(
@@ -153,14 +155,14 @@ class DataFrameCreateSpec extends fixture.FlatSpec with InsightEdge {
 
     ie.spaceProxy.writeMultiple(Array(
       new SpaceDocument(collectionName, Map(
-        "personId" -> "111",
-        "name" -> "John", "surname" -> "Wind", "age" -> Integer.valueOf(32),
-        "address" -> Address("New York", "NY"), "jaddress" -> new JAddress("New York", "NY")
+        "personId" -> "111"
+        ,"name" -> "John", "surname" -> "Wind", "age" -> Integer.valueOf(32)
+        ,"address" -> Address("New York", "NY"), "jaddress" -> new JAddress("New York", "NY")
       )),
       new SpaceDocument(collectionName, Map(
-        "personId" -> "222",
-        "name" -> "Mike", "surname" -> "Green", "age" -> Integer.valueOf(20),
-        "address" -> Address("Charlotte", "NC"), "jaddress" -> new JAddress("Charlotte", "NC")
+        "personId" -> "222"
+        ,"name" -> "Mike", "surname" -> "Green", "age" -> Integer.valueOf(20)
+        ,"address" -> Address("Charlotte", "NC"), "jaddress" -> new JAddress("Charlotte", "NC")
       ))
     ))
 
@@ -191,16 +193,16 @@ class DataFrameCreateSpec extends fixture.FlatSpec with InsightEdge {
       StructField("city", StringType, nullable = true)
     ))
     val spark = ie.spark
-    val df = spark.read.schema(
-      StructType(Seq(
+    val df = spark.read
+      .schema(StructType(Seq(
         StructField("personId", StringType, nullable = false),
         StructField("name", StringType, nullable = true),
         StructField("surname", StringType, nullable = true),
         StructField("age", IntegerType, nullable = false),
         StructField("address", addressType.copy(), nullable = true, nestedClass[Address]),
         StructField("jaddress", addressType.copy(), nullable = true, nestedClass[JAddress])
-      ))
-    ).grid(collectionName)
+      )))
+      .grid(collectionName)
     df.printSchema()
 
     // check schema

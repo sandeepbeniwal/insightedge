@@ -79,13 +79,14 @@ class DataSetNestedQuerySpec extends fixture.FlatSpec with InsightEdge {
   }
 
   it should "support nested properties after saving" taggedAs ScalaSpaceClass in { ie =>
+    turnNestedDFFlagOn()
+
     ie.sc.parallelize(Seq(
       Person(id = null, name = "Paul", age = 30, address = Address(city = "Columbus", state = "OH")),
       Person(id = null, name = "Mike", age = 25, address = Address(city = "Buffalo", state = "NY")),
       Person(id = null, name = "John", age = 20, address = Address(city = "Charlotte", state = "NC")),
       Person(id = null, name = "Silvia", age = 27, address = Address(city = "Charlotte", state = "NC"))
     )).saveToGrid()
-
 
     val collectionName = randomString()
     val spark = ie.spark
@@ -108,6 +109,8 @@ class DataSetNestedQuerySpec extends fixture.FlatSpec with InsightEdge {
   }
 
   it should "support nested properties after saving [java]" taggedAs ScalaSpaceClass in { ie =>
+    turnNestedDFFlagOn()
+
     parallelizeJavaSeq(ie.sc, () => Seq(
       new JPerson(null, "Paul", 30, new JAddress("Columbus", "OH")),
       new JPerson(null, "Mike", 25, new JAddress("Buffalo", "NY")),

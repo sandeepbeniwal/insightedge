@@ -37,9 +37,33 @@ private[insightedge] case class InsightEdgeDocumentRelation(
   extends InsightEdgeAbstractRelation(context, options) with Serializable {
 
   private val DATAFRAME_ID_PROPERTY = "i9e_DfId"
+  private val DATAFRAME_SCHEMA_FLAG = "flag"
 
   lazy val inferredSchema: StructType = {
-    getStructType(collection)
+    /**
+     * We use DataframeSchema to save the schema of the DF because we don't support nested schema in our type descriptor.
+     * Therefore when we want to save Dataframe with nested properties and read it back later we'll use DataframeSchema
+     * else we won't turn the `Nested properties` flag on
+     * When we read Document with nested properties as DF but we provide schema, the flag should be off.
+     */
+    if (isThereDFSchemaFlag) {
+      gs.read[DataFrameSchema](new IdQuery(classOf[DataFrameSchema], collection)) match {
+        case null => getStructType(collection)
+        case storedSchema => storedSchema.schema
+      }
+    } else {
+      getStructType(collection)
+    }
+  }
+
+  private def isThereDFSchemaFlag(): Boolean = { // rewrite better
+    val prop = System.getProperty(DATAFRAME_SCHEMA_FLAG)
+    var returnType = false
+
+    if (prop != null && prop.equalsIgnoreCase("true")) {
+     returnType = true
+    }
+    returnType
   }
 
   private def getStructType(collection : String): StructType = {
@@ -64,25 +88,37 @@ private[insightedge] case class InsightEdgeDocumentRelation(
       gs.clear(new SpaceDocument(collection))
     }
 
+    val properties = data.schema.toAttributes.map(field => field.name -> dataTypeClassRepresentation(field.dataType)).toMap
+
     if (gs.getTypeManager.getTypeDescriptor(collection) == null) {
-      gs.getTypeManager.registerTypeDescriptor(new SpaceTypeDescriptorBuilder(collection).supportsDynamicProperties(true).create())
+      var spaceTypeDescriptorBuilder = new SpaceTypeDescriptorBuilder(collection)
+        .supportsDynamicProperties(true)
+        .idProperty(DATAFRAME_ID_PROPERTY, true)
+        .addFixedProperty(DATAFRAME_ID_PROPERTY, classOf[String])
+
+      spaceTypeDescriptorBuilder = addFixedProperties(spaceTypeDescriptorBuilder, properties)
+      gs.getTypeManager.registerTypeDescriptor(spaceTypeDescriptorBuilder.create())
     }
 
     data.rdd.mapPartitions { rows =>
-      InsightEdgeAbstractRelation.rowsToDocuments(rows, schema).map(document => new SpaceDocument(collection, document))
+      InsightEdgeAbstractRelation.rowsToDocuments(rows, schema).map(document => {
+        new SpaceDocument(collection, document)
+      })
     }.saveToGrid()
 
-    def removeMetadata(s: StructType): StructType = {
-      StructType(s.fields.map { f =>
-        f.copy(metadata = Metadata.empty, dataType = f.dataType match {
-          case dt: StructType => removeMetadata(dt)
-          case dt => dt
+    if (isThereDFSchemaFlag()) {
+      def removeMetadata(structType: StructType): StructType = {
+        StructType(structType.fields.map { structField =>
+          structField.copy(metadata = Metadata.empty, dataType = structField.dataType match {
+            case dt: StructType => removeMetadata(dt)
+            case dt => dt
+          })
         })
-      })
-    }
+      }
 
-    val metalessSchema = removeMetadata(schema)
-    gs.write(new DataFrameSchema(collection, metalessSchema))
+      val metalessSchema = removeMetadata(schema)
+      gs.write(new DataFrameSchema(collection, metalessSchema))
+    }
   }
 
   override def insert(data: DataFrame, mode: SaveMode): Unit = {
