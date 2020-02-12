@@ -119,8 +119,8 @@ trait InsightEdge extends fixture.FlatSpec with BeforeAndAfterEach {
   /**
    * Sets property of using DataframeSchema class on for the duration of the unit test
    */
-  def turnNestedDFFlagOn() { System.setProperty("flag", "true") }
-  def turnNestedDFFlagOff() { System.setProperty("flag", "false") }
+  def turnNestedDFFlagOn() { System.setProperty("UseNestedDataFrame", "true") }
+  def turnNestedDFFlagOff() { System.setProperty("UseNestedDataFrame", "false") }
 
   override protected def beforeEach(): Unit = turnNestedDFFlagOff
 }

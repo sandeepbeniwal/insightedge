@@ -16,11 +16,12 @@
 
 package org.apache.spark.sql.insightedge.relation
 
+import java.lang.Boolean.getBoolean
+
 import com.gigaspaces.document.SpaceDocument
 import com.gigaspaces.metadata.{SpacePropertyDescriptor, SpaceTypeDescriptorBuilder}
 import com.gigaspaces.query.IdQuery
 import com.j_spaces.core.client.SQLQuery
-import javax.activation.UnsupportedDataTypeException
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SaveMode._
 import org.apache.spark.sql._
@@ -28,7 +29,6 @@ import org.apache.spark.sql.insightedge.{DataFrameSchema, InsightEdgeSourceOptio
 import org.apache.spark.sql.types._
 import org.insightedge.spark.implicits.basic._
 import org.insightedge.spark.rdd.InsightEdgeDocumentRDD
-
 private[insightedge] case class InsightEdgeDocumentRelation(
                                                             context: SQLContext,
                                                             collection: String,
@@ -36,8 +36,8 @@ private[insightedge] case class InsightEdgeDocumentRelation(
                                                           )
   extends InsightEdgeAbstractRelation(context, options) with Serializable {
 
-  private val DATAFRAME_ID_PROPERTY = "i9e_DfId"
-  private val DATAFRAME_SCHEMA_FLAG = "flag"
+  private[this] val DATAFRAME_ID_PROPERTY = "i9e_DfId"
+  private[this] val DATAFRAME_SCHEMA_FLAG = "UseNestedDataFrame"
 
   lazy val inferredSchema: StructType = {
     /**
@@ -46,7 +46,7 @@ private[insightedge] case class InsightEdgeDocumentRelation(
      * else we won't turn the `Nested properties` flag on
      * When we read Document with nested properties as DF but we provide schema, the flag should be off.
      */
-    if (isThereDFSchemaFlag) {
+    if (useDataFrameSchema) {
       gs.read[DataFrameSchema](new IdQuery(classOf[DataFrameSchema], collection)) match {
         case null => getStructType(collection)
         case storedSchema => storedSchema.schema
@@ -56,14 +56,8 @@ private[insightedge] case class InsightEdgeDocumentRelation(
     }
   }
 
-  private def isThereDFSchemaFlag(): Boolean = { // rewrite better
-    val prop = System.getProperty(DATAFRAME_SCHEMA_FLAG)
-    var returnType = false
-
-    if (prop != null && prop.equalsIgnoreCase("true")) {
-     returnType = true
-    }
-    returnType
+  private def useDataFrameSchema(): Boolean = {
+    getBoolean(DATAFRAME_SCHEMA_FLAG)
   }
 
   private def getStructType(collection : String): StructType = {
@@ -88,15 +82,15 @@ private[insightedge] case class InsightEdgeDocumentRelation(
       gs.clear(new SpaceDocument(collection))
     }
 
-    val properties = data.schema.toAttributes.map(field => field.name -> dataTypeClassRepresentation(field.dataType)).toMap
+    val properties = data.schema.toAttributes.map(field => field.name -> dataTypeToClass(field.dataType)).toMap
 
     if (gs.getTypeManager.getTypeDescriptor(collection) == null) {
-      var spaceTypeDescriptorBuilder = new SpaceTypeDescriptorBuilder(collection)
+      val spaceTypeDescriptorBuilder = new SpaceTypeDescriptorBuilder(collection)
         .supportsDynamicProperties(true)
         .idProperty(DATAFRAME_ID_PROPERTY, true)
         .addFixedProperty(DATAFRAME_ID_PROPERTY, classOf[String])
 
-      spaceTypeDescriptorBuilder = addFixedProperties(spaceTypeDescriptorBuilder, properties)
+      for ((k,v) <- properties) { spaceTypeDescriptorBuilder.addFixedProperty(k,v) }
       gs.getTypeManager.registerTypeDescriptor(spaceTypeDescriptorBuilder.create())
     }
 
@@ -106,7 +100,7 @@ private[insightedge] case class InsightEdgeDocumentRelation(
       })
     }.saveToGrid()
 
-    if (isThereDFSchemaFlag()) {
+    if (useDataFrameSchema()) {
       def removeMetadata(structType: StructType): StructType = {
         StructType(structType.fields.map { structField =>
           structField.copy(metadata = Metadata.empty, dataType = structField.dataType match {
@@ -164,20 +158,23 @@ private[insightedge] case class InsightEdgeDocumentRelation(
   }
 
 
-  private def dataTypeClassRepresentation(dataType: DataType): String = {
-    val firstChar = dataType.typeName.charAt(0)
-    val upperFirstChar = firstChar.toUpper
-
-    "java.lang." + dataType.typeName.replaceFirst(firstChar.toString, upperFirstChar.toString)
-  }
-
-  private def addFixedProperties(stdb: SpaceTypeDescriptorBuilder, properties: Map[String, String]): SpaceTypeDescriptorBuilder = {
-    var newSpaceTypeDescriptorBuilder = stdb
-
-    for ((k,v) <- properties) {
-      newSpaceTypeDescriptorBuilder = stdb.addFixedProperty(k,v)
-    }
-    newSpaceTypeDescriptorBuilder
+  private def dataTypeToClass(dataType: AbstractDataType): String = dataType match {
+    case ByteType => "java.lang.Byte"
+    case ShortType => "java.lang.Short"
+    case IntegerType => "java.lang.Integer"
+    case LongType => "java.lang.Long"
+    case FloatType => "java.lang.Float"
+    case DoubleType => "java.lang.Double"
+    case DecimalType => "java.math.BigDecimal"
+    case StringType => "java.lang.String"
+    case BinaryType => "Array[Byte]"
+    case BooleanType => "java.lang.Boolean"
+    case TimestampType => "java.sql.Timestamp"
+    case DateType => "java.sql.Date"
+    case ArrayType => "scala.collection.Seq"
+    case MapType => "scala.collection.Map"
+    case StructType => "java.lang.Struct" // "org.apache.spark.sql.Row"
+    case _ => "String"
   }
 
 }

@@ -84,19 +84,22 @@ class DataFrameNestedQuerySpec extends fixture.FlatSpec with InsightEdge {
 
     val collectionName = randomString()
     val spark = ie.spark
-    spark.read.grid[Person].write.grid(collectionName)
-    val df2 = spark.read.grid(collectionName)
-    df2.printSchema()
-    df2.show()
+    val dataframeClass = spark.read.grid[Person]
+    dataframeClass.write.grid(collectionName)
+
+// TODO fix writing df with nested properties to space when the df was read as a collection like the example below.
+//    val dataFrameDocument = spark.read.grid("org.apache.spark.sql.insightedge.model.Person")
+//    dataFrameDocument.write.grid(collectionName)
+
     val person = ie.spaceProxy.read(new SQLQuery[SpaceDocument](collectionName, ""))
     assert(person.getProperty[Any]("address").isInstanceOf[DocumentProperties])
     assert(person.getProperty[Any]("age").isInstanceOf[Integer])
     assert(person.getProperty[Any]("name").isInstanceOf[String])
 
-    val df = spark.read.grid(collectionName)
-    assert(df.count() == 4)
-    assert(df.filter(df("address.state") equalTo "NC").count() == 2)
-    assert(df.filter(df("address.city") equalTo "Nowhere").count() == 0)
+    val dataframeCollection = spark.read.grid(collectionName)
+    assert(dataframeCollection.count() == 4)
+    assert(dataframeCollection.filter(dataframeCollection("address.state") equalTo "NC").count() == 2)
+    assert(dataframeCollection.filter(dataframeCollection("address.city") equalTo "Nowhere").count() == 0)
   }
 
   it should "support nested properties after saving [java]" taggedAs ScalaSpaceClass in { ie =>
