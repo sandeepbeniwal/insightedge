@@ -40,6 +40,7 @@ class DataFrameNestedQuerySpec extends fixture.FlatSpec with InsightEdge {
 
     val df = spark.read.grid[Person]
     df.printSchema()
+    df.show()
     assert(df.count() == 4)
     assert(df.filter(df("address.city") equalTo "Buffalo").count() == 1)
 
@@ -73,7 +74,6 @@ class DataFrameNestedQuerySpec extends fixture.FlatSpec with InsightEdge {
   }
 
   it should "support nested properties after saving" taggedAs ScalaSpaceClass in { ie =>
-    turnNestedDFFlagOn
 
     ie.sc.parallelize(Seq(
       Person(id = null, name = "Paul", age = 30, address = Address(city = "Columbus", state = "OH")),
@@ -97,13 +97,14 @@ class DataFrameNestedQuerySpec extends fixture.FlatSpec with InsightEdge {
     assert(person.getProperty[Any]("name").isInstanceOf[String])
 
     val dataframeCollection = spark.read.grid(collectionName)
+    dataframeCollection.printSchema()
+    dataframeCollection.show()
     assert(dataframeCollection.count() == 4)
     assert(dataframeCollection.filter(dataframeCollection("address.state") equalTo "NC").count() == 2)
     assert(dataframeCollection.filter(dataframeCollection("address.city") equalTo "Nowhere").count() == 0)
   }
 
   it should "support nested properties after saving [java]" taggedAs ScalaSpaceClass in { ie =>
-    turnNestedDFFlagOn
 
     parallelizeJavaSeq(ie.sc, () => Seq(
       new JPerson(null, "Paul", 30, new JAddress("Columbus", "OH")),

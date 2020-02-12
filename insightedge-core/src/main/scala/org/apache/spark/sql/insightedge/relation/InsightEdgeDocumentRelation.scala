@@ -29,6 +29,7 @@ import org.apache.spark.sql.insightedge.{DataFrameSchema, InsightEdgeSourceOptio
 import org.apache.spark.sql.types._
 import org.insightedge.spark.implicits.basic._
 import org.insightedge.spark.rdd.InsightEdgeDocumentRDD
+
 private[insightedge] case class InsightEdgeDocumentRelation(
                                                             context: SQLContext,
                                                             collection: String,
@@ -37,7 +38,6 @@ private[insightedge] case class InsightEdgeDocumentRelation(
   extends InsightEdgeAbstractRelation(context, options) with Serializable {
 
   private[this] val DATAFRAME_ID_PROPERTY = "i9e_DfId"
-  private[this] val DATAFRAME_SCHEMA_FLAG = "UseNestedDataFrame"
 
   lazy val inferredSchema: StructType = {
     /**
@@ -46,18 +46,10 @@ private[insightedge] case class InsightEdgeDocumentRelation(
      * else we won't turn the `Nested properties` flag on
      * When we read Document with nested properties as DF but we provide schema, the flag should be off.
      */
-    if (useDataFrameSchema) {
-      gs.read[DataFrameSchema](new IdQuery(classOf[DataFrameSchema], collection)) match {
-        case null => getStructType(collection)
-        case storedSchema => storedSchema.schema
-      }
-    } else {
-      getStructType(collection)
+    gs.read[DataFrameSchema](new IdQuery(classOf[DataFrameSchema], collection)) match {
+      case null => getStructType(collection)
+      case storedSchema => storedSchema.schema
     }
-  }
-
-  private def useDataFrameSchema(): Boolean = {
-    getBoolean(DATAFRAME_SCHEMA_FLAG)
   }
 
   private def getStructType(collection : String): StructType = {
@@ -81,15 +73,16 @@ private[insightedge] case class InsightEdgeDocumentRelation(
     if (overwrite && !collectionIsEmpty) {
       gs.clear(new SpaceDocument(collection))
     }
+    val attributes = data.schema.toAttributes
+    val useDataFrameSchema = attributes.exists(attribute => isStructType(attribute.dataType))
 
-    val properties = data.schema.toAttributes.map(field => field.name -> dataTypeToClass(field.dataType)).toMap
-
+    val properties = attributes.map(field => field.name -> dataTypeToClass(field.dataType)).toMap
     if (gs.getTypeManager.getTypeDescriptor(collection) == null) {
+
       val spaceTypeDescriptorBuilder = new SpaceTypeDescriptorBuilder(collection)
         .supportsDynamicProperties(true)
         .idProperty(DATAFRAME_ID_PROPERTY, true)
         .addFixedProperty(DATAFRAME_ID_PROPERTY, classOf[String])
-
       for ((k,v) <- properties) { spaceTypeDescriptorBuilder.addFixedProperty(k,v) }
       gs.getTypeManager.registerTypeDescriptor(spaceTypeDescriptorBuilder.create())
     }
@@ -100,7 +93,8 @@ private[insightedge] case class InsightEdgeDocumentRelation(
       })
     }.saveToGrid()
 
-    if (useDataFrameSchema()) {
+
+    if (useDataFrameSchema) {
       def removeMetadata(structType: StructType): StructType = {
         StructType(structType.fields.map { structField =>
           structField.copy(metadata = Metadata.empty, dataType = structField.dataType match {
@@ -157,23 +151,27 @@ private[insightedge] case class InsightEdgeDocumentRelation(
     rdd.mapPartitions { data => InsightEdgeAbstractRelation.beansToRows(data, clazzName, schema, fields) }
   }
 
+  private def isStructType(dataType: DataType): Boolean = dataType match {
+    case _: StructType => true
+    case _ => false
+  }
 
-  private def dataTypeToClass(dataType: AbstractDataType): String = dataType match {
-    case ByteType => "java.lang.Byte"
-    case ShortType => "java.lang.Short"
-    case IntegerType => "java.lang.Integer"
-    case LongType => "java.lang.Long"
-    case FloatType => "java.lang.Float"
-    case DoubleType => "java.lang.Double"
-    case DecimalType => "java.math.BigDecimal"
-    case StringType => "java.lang.String"
-    case BinaryType => "Array[Byte]"
-    case BooleanType => "java.lang.Boolean"
-    case TimestampType => "java.sql.Timestamp"
-    case DateType => "java.sql.Date"
-    case ArrayType => "scala.collection.Seq"
-    case MapType => "scala.collection.Map"
-    case StructType => "java.lang.Struct" // "org.apache.spark.sql.Row"
+  private def dataTypeToClass(dataType: DataType): String = dataType match {
+    case _: ByteType => "java.lang.Byte"
+    case _: ShortType => "java.lang.Short"
+    case _: IntegerType => "java.lang.Integer"
+    case _: LongType => "java.lang.Long"
+    case _: FloatType => "java.lang.Float"
+    case _: DoubleType => "java.lang.Double"
+    case _: DecimalType => "java.math.BigDecimal"
+    case _: StringType => "java.lang.String"
+    case _: BinaryType => "Array[Byte]"
+    case _: BooleanType => "java.lang.Boolean"
+    case _: TimestampType => "java.sql.Timestamp"
+    case _: DateType => "java.sql.Date"
+    case _: ArrayType => "scala.collection.Seq"
+    case _: MapType => "scala.collection.Map"
+    case _: StructType => "org.apache.spark.sql.Row"
     case _ => "String"
   }
 

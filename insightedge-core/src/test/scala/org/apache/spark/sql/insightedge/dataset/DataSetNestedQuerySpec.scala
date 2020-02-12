@@ -79,7 +79,6 @@ class DataSetNestedQuerySpec extends fixture.FlatSpec with InsightEdge {
   }
 
   it should "support nested properties after saving" taggedAs ScalaSpaceClass in { ie =>
-    turnNestedDFFlagOn()
 
     ie.sc.parallelize(Seq(
       Person(id = null, name = "Paul", age = 30, address = Address(city = "Columbus", state = "OH")),
@@ -109,7 +108,6 @@ class DataSetNestedQuerySpec extends fixture.FlatSpec with InsightEdge {
   }
 
   it should "support nested properties after saving [java]" taggedAs ScalaSpaceClass in { ie =>
-    turnNestedDFFlagOn()
 
     parallelizeJavaSeq(ie.sc, () => Seq(
       new JPerson(null, "Paul", 30, new JAddress("Columbus", "OH")),

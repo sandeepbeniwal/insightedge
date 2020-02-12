@@ -37,7 +37,7 @@ import scala.util.Random
   *
   * @author Oleksiy_Dyagilev
   */
-trait InsightEdge extends fixture.FlatSpec with BeforeAndAfterEach {
+trait InsightEdge extends fixture.FlatSpec {
   self: Suite =>
 
   val ieConfig = InsightEdgeConfig("test-space", Some("spark"), Some("localhost:4174"))
@@ -116,11 +116,4 @@ trait InsightEdge extends fixture.FlatSpec with BeforeAndAfterEach {
 
   def randomString() = RandomStringUtils.random(10, "abcdefghijklmnopqrst")
 
-  /**
-   * Sets property of using DataframeSchema class on for the duration of the unit test
-   */
-  def turnNestedDFFlagOn() { System.setProperty("UseNestedDataFrame", "true") }
-  def turnNestedDFFlagOff() { System.setProperty("UseNestedDataFrame", "false") }
-
-  override protected def beforeEach(): Unit = turnNestedDFFlagOff
 }
