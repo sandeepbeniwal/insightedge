@@ -16,12 +16,15 @@
 
 package org.apache.spark.sql.insightedge.dataframe
 
+import java.sql.{Date, Timestamp}
+
 import com.gigaspaces.document.SpaceDocument
 import com.j_spaces.core.client.SQLQuery
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.insightedge.JSpatialData
-import org.apache.spark.sql.insightedge.model.{Location, SpatialData, SpatialEmbeddedData}
+import org.apache.spark.sql.insightedge.model.{AllClassesSupport, Location, SpatialData, SpatialEmbeddedData}
+import org.apache.spark.unsafe.types.CalendarInterval
 import org.insightedge.spark.fixture.InsightEdge
 import org.insightedge.spark.implicits.all._
 import org.insightedge.spark.utils.{JavaSpaceClass, ScalaSpaceClass}
@@ -89,6 +92,52 @@ class DataFrameSpatialSpec extends fixture.FlatSpec with InsightEdge {
     // executed in expressions on Spark
     val pdf = df.persist()
     zeroPointCheck(pdf, "point")
+  }
+
+  it should "dataframe: support more types." taggedAs ScalaSpaceClass in { ie =>
+    ie.spaceProxy.writeMultiple(Array(
+      AllClassesSupport("lala",6 , BigDecimal.valueOf(60), Array(25.toByte, 66.toByte)
+      ,new CalendarInterval(12, 454564156), Map("s" -> "ss", "b" -> "bb")
+        , new Timestamp(777), new Date(System.currentTimeMillis()))
+      ,AllClassesSupport("aalala",6 , BigDecimal.valueOf(70), Array(25.toByte, 66.toByte)
+        ,new CalendarInterval(12, 454564156), Map("Zs" -> "ss", "b" -> "bb")
+        , new Timestamp(999), new Date(System.currentTimeMillis()))
+      ,AllClassesSupport("lswqdala",6 , BigDecimal.valueOf(60), Array(25.toByte, 66.toByte)
+        ,new CalendarInterval(12, 454564156), Map("s" -> "ss", "b" -> "bb")
+        , new Timestamp(777), new Date(System.currentTimeMillis()))
+      ))
+
+    val spark = ie.spark
+    val regularDataFrame = spark.read.grid[AllClassesSupport]
+
+    regularDataFrame.write.grid("collection")
+    val dataFrameFromSpace = spark.read.grid("collection")
+    regularDataFrame.printSchema()
+    dataFrameFromSpace.printSchema()
+    println(regularDataFrame.dtypes.equals(dataFrameFromSpace.dtypes))
+    println(regularDataFrame.dtypes)
+    println(dataFrameFromSpace.dtypes)
+    regularDataFrame.show()
+    dataFrameFromSpace.show()
+    dataFrameFromSpace.count()
+
+    assert(regularDataFrame.filter(regularDataFrame("decimal") equalTo BigDecimal.valueOf(60)).count() == 2)
+    assert(dataFrameFromSpace.filter(dataFrameFromSpace("decimal") equalTo BigDecimal.valueOf(60)).count() == 2)
+
+    assert(regularDataFrame.filter(regularDataFrame("byte") equalTo Array(25.toByte, 66.toByte)).count() == 3)
+    assert(dataFrameFromSpace.filter(dataFrameFromSpace("byte") equalTo  Array(25.toByte, 66.toByte)).count() == 3)
+
+    assert(regularDataFrame.filter(regularDataFrame("map") equalTo Map("s" -> "ss", "b" -> "bb")).count() == 2)
+    assert(dataFrameFromSpace.filter(dataFrameFromSpace("map") equalTo Map("s" -> "ss", "b" -> "bb")).count() == 2)
+
+    assert(regularDataFrame.filter(regularDataFrame("timeStamp") equalTo new Timestamp(999)).count() == 1)
+    assert(dataFrameFromSpace.filter(dataFrameFromSpace("timeStamp") equalTo new Timestamp(999)).count() == 1)
+
+    assert(regularDataFrame.filter(regularDataFrame("date") equalTo new Date(System.currentTimeMillis())).count() == 0)
+    assert(dataFrameFromSpace.filter(dataFrameFromSpace("date") equalTo new Date(System.currentTimeMillis())).count() == 0)
+
+    assert(regularDataFrame.filter(regularDataFrame("calendarInterval") equalTo new CalendarInterval(12, 454564156)).count() == 3)
+    assert(dataFrameFromSpace.filter(dataFrameFromSpace("calendarInterval") equalTo new CalendarInterval(12, 454564156)).count() == 3)
   }
 
   it should "dataframe: work with shapes embedded on second level" taggedAs ScalaSpaceClass in { ie =>

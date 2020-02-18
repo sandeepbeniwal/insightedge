@@ -16,8 +16,6 @@
 
 package org.apache.spark.sql.insightedge.relation
 
-import java.lang.Boolean.getBoolean
-
 import com.gigaspaces.document.SpaceDocument
 import com.gigaspaces.metadata.{SpacePropertyDescriptor, SpaceTypeDescriptorBuilder}
 import com.gigaspaces.query.IdQuery
@@ -25,8 +23,10 @@ import com.j_spaces.core.client.SQLQuery
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SaveMode._
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.{InternalRow, ScalaReflection}
 import org.apache.spark.sql.insightedge.{DataFrameSchema, InsightEdgeSourceOptions}
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.CalendarInterval
 import org.insightedge.spark.implicits.basic._
 import org.insightedge.spark.rdd.InsightEdgeDocumentRDD
 
@@ -73,10 +73,26 @@ private[insightedge] case class InsightEdgeDocumentRelation(
     if (overwrite && !collectionIsEmpty) {
       gs.clear(new SpaceDocument(collection))
     }
-    val attributes = data.schema.toAttributes
-    val useDataFrameSchema = attributes.exists(attribute => isStructType(attribute.dataType))
 
-    val properties = attributes.map(field => field.name -> dataTypeToClass(field.dataType)).toMap
+    def javaBoxedType(dt: DataType): Class[_] = dt match {
+      case _: DecimalType => classOf[Decimal]
+      case BinaryType => classOf[Array[Byte]]
+      case StringType => classOf[String]
+      case CalendarIntervalType => classOf[CalendarInterval]
+      case _: TimestampType => classOf[TimestampType]
+      case _: DateType => classOf[DateType]
+      case _: StructType => classOf[InternalRow]
+      case _: ArrayType => classOf[ArrayType]
+      case _: MapType => classOf[MapType]
+      case udt: UserDefinedType[_] => javaBoxedType(udt.sqlType)
+      case ObjectType(cls) => cls
+      case _ => ScalaReflection.typeBoxedJavaMapping.getOrElse(dt, classOf[java.lang.Object])
+    }
+
+    val attributes = data.schema.toAttributes
+    for (f <- attributes) {println("name= " + f.name + "dt= " + f.dataType)}
+    val useDataFrameSchema = attributes.exists(attribute => isStructType(attribute.dataType))
+    val properties: Map[String, Class[_]] = attributes.map(field => field.name -> javaBoxedType(field.dataType)).toMap
     if (gs.getTypeManager.getTypeDescriptor(collection) == null) {
 
       val spaceTypeDescriptorBuilder = new SpaceTypeDescriptorBuilder(collection)
@@ -84,6 +100,7 @@ private[insightedge] case class InsightEdgeDocumentRelation(
         .idProperty(DATAFRAME_ID_PROPERTY, true)
         .addFixedProperty(DATAFRAME_ID_PROPERTY, classOf[String])
       for ((k,v) <- properties) { spaceTypeDescriptorBuilder.addFixedProperty(k,v) }
+      for ((k,v) <- properties) { println(k,v) }
       gs.getTypeManager.registerTypeDescriptor(spaceTypeDescriptorBuilder.create())
     }
 
@@ -156,23 +173,23 @@ private[insightedge] case class InsightEdgeDocumentRelation(
     case _ => false
   }
 
-  private def dataTypeToClass(dataType: DataType): String = dataType match {
-    case _: ByteType => "java.lang.Byte"
-    case _: ShortType => "java.lang.Short"
-    case _: IntegerType => "java.lang.Integer"
-    case _: LongType => "java.lang.Long"
-    case _: FloatType => "java.lang.Float"
-    case _: DoubleType => "java.lang.Double"
-    case _: DecimalType => "java.math.BigDecimal"
-    case _: StringType => "java.lang.String"
-    case _: BinaryType => "Array[Byte]"
-    case _: BooleanType => "java.lang.Boolean"
-    case _: TimestampType => "java.sql.Timestamp"
-    case _: DateType => "java.sql.Date"
-    case _: ArrayType => "scala.collection.Seq"
-    case _: MapType => "scala.collection.Map"
-    case _: StructType => "org.apache.spark.sql.Row"
-    case _ => "String"
-  }
+//  private def dataTypeToClass(dataType: DataType): String = dataType match {
+//    case _: ByteType => "java.lang.Byte"
+//    case _: ShortType => "java.lang.Short"
+//    case _: IntegerType => "java.lang.Integer"
+//    case _: LongType => "java.lang.Long"
+//    case _: FloatType => "java.lang.Float"
+//    case _: DoubleType => "java.lang.Double"
+//    case _: DecimalType => "java.math.BigDecimal" /*TODO*/
+//    case _: StringType => "java.lang.String"
+//    case _: BinaryType => "Array[Byte]" /*TODO*/
+//    case _: BooleanType => "java.lang.Boolean"
+//    case _: TimestampType => "java.sql.Timestamp" /*TODO*/
+//    case _: DateType => "java.sql.Date" /*TODO*/
+//    case _: ArrayType => "scala.collection.Seq" /*TODO*/
+//    case _: MapType => "scala.collection.Map" /*TODO*/
+//    case _: StructType => "org.apache.spark.sql.Row"
+//    case _ => "String"
+//  }
 
 }
