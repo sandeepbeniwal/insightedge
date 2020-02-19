@@ -239,9 +239,8 @@ object InsightEdgeAbstractRelation {
 
       // Getters for DocumentProperties are document.getProperty[T](name)
       case c if classOf[DocumentProperties].isAssignableFrom(clazz) =>
-        val result = attributeNames
-          .map(a => a ->(anyNestedClass, (e: Any) => e.asInstanceOf[DocumentProperties].getProperty[Any](a)))
-        result.toMap
+        attributeNames
+          .map(a => a ->(anyNestedClass, (e: Any) => e.asInstanceOf[DocumentProperties].getProperty[Any](a))).toMap
 
       //extract name function from enum, ordinal not supported
       case c if clazz.isEnum =>

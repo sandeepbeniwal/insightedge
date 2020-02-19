@@ -89,17 +89,16 @@ private[insightedge] case class InsightEdgeDocumentRelation(
     // TODO|(one has integer the other has Date and in addition it pulls Date from space but trying to cast it into an Integer!
 
     val attributes = data.schema.toAttributes
-    for (f <- attributes) {println("name= " + f.name + "dt= " + f.dataType)}
     val useDataFrameSchema = attributes.exists(attribute => isStructType(attribute.dataType))
     val properties: Map[String, Class[_]] = attributes.map(field => field.name -> javaBoxedType(field.dataType)).toMap
-    if (gs.getTypeManager.getTypeDescriptor(collection) == null) {
 
+    if (gs.getTypeManager.getTypeDescriptor(collection) == null) {
       val spaceTypeDescriptorBuilder = new SpaceTypeDescriptorBuilder(collection)
         .supportsDynamicProperties(true)
         .idProperty(DATAFRAME_ID_PROPERTY, true)
         .addFixedProperty(DATAFRAME_ID_PROPERTY, classOf[String])
+
       for ((k,v) <- properties) { spaceTypeDescriptorBuilder.addFixedProperty(k,v) }
-      for ((k,v) <- properties) { println(k,v) }
       gs.getTypeManager.registerTypeDescriptor(spaceTypeDescriptorBuilder.create())
     }
 
