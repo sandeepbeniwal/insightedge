@@ -32,15 +32,13 @@ case class AllClassesSupport(
 
                         @BeanProperty @SpaceId(autoGenerate = true) var id: String
                         ,@BeanProperty @SpaceRouting var routing: Long
-                        ,@BeanProperty var decimal: BigDecimal // TODO Shouldn't be
+                        ,@BeanProperty var decimal: java.math.BigDecimal
                         ,@BeanProperty var byte: Array[Byte]
-                        ,@BeanProperty var calendarInterval: CalendarInterval // TODO Shouldn't be
-                        ,@BeanProperty var map: Map[String, String]
-                        ,@BeanProperty var timeStamp: Timestamp
-                        ,@BeanProperty var date: Date
+                        ,@BeanProperty var timeStamp: java.sql.Timestamp
+                        ,@BeanProperty var date: java.sql.Date
                       ) {
 
-  def this(routing: Long) = this(null, routing, null, null, null, null, null, null)
+  def this(routing: Long) = this(null, routing, null, null, null, null)
 
   def this() = this(-1)
 }

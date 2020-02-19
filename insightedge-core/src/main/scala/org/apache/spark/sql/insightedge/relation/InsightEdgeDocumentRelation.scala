@@ -43,8 +43,7 @@ private[insightedge] case class InsightEdgeDocumentRelation(
     /**
      * We use DataframeSchema to save the schema of the DF because we don't support nested schema in our type descriptor.
      * Therefore when we want to save Dataframe with nested properties and read it back later we'll use DataframeSchema
-     * else we won't turn the `Nested properties` flag on
-     * When we read Document with nested properties as DF but we provide schema, the flag should be off.
+     * When we won't use nested properties, we will use the getStructType which is using the type descriptor.
      */
     gs.read[DataFrameSchema](new IdQuery(classOf[DataFrameSchema], collection)) match {
       case null => getStructType(collection)
@@ -79,8 +78,6 @@ private[insightedge] case class InsightEdgeDocumentRelation(
       case BinaryType => classOf[Array[Byte]]
       case StringType => classOf[String]
       case CalendarIntervalType => classOf[CalendarInterval]
-      case _: TimestampType => classOf[TimestampType]
-      case _: DateType => classOf[DateType]
       case _: StructType => classOf[InternalRow]
       case _: ArrayType => classOf[ArrayType]
       case _: MapType => classOf[MapType]
@@ -88,6 +85,8 @@ private[insightedge] case class InsightEdgeDocumentRelation(
       case ObjectType(cls) => cls
       case _ => ScalaReflection.typeBoxedJavaMapping.getOrElse(dt, classOf[java.lang.Object])
     }
+    // TODO| turning Date to Integer makes a difference between DF read from POJO and DF read from Dataframe in space.
+    // TODO|(one has integer the other has Date and in addition it pulls Date from space but trying to cast it into an Integer!
 
     val attributes = data.schema.toAttributes
     for (f <- attributes) {println("name= " + f.name + "dt= " + f.dataType)}
@@ -173,23 +172,23 @@ private[insightedge] case class InsightEdgeDocumentRelation(
     case _ => false
   }
 
-//  private def dataTypeToClass(dataType: DataType): String = dataType match {
-//    case _: ByteType => "java.lang.Byte"
-//    case _: ShortType => "java.lang.Short"
-//    case _: IntegerType => "java.lang.Integer"
-//    case _: LongType => "java.lang.Long"
-//    case _: FloatType => "java.lang.Float"
-//    case _: DoubleType => "java.lang.Double"
-//    case _: DecimalType => "java.math.BigDecimal" /*TODO*/
-//    case _: StringType => "java.lang.String"
-//    case _: BinaryType => "Array[Byte]" /*TODO*/
-//    case _: BooleanType => "java.lang.Boolean"
-//    case _: TimestampType => "java.sql.Timestamp" /*TODO*/
-//    case _: DateType => "java.sql.Date" /*TODO*/
-//    case _: ArrayType => "scala.collection.Seq" /*TODO*/
-//    case _: MapType => "scala.collection.Map" /*TODO*/
-//    case _: StructType => "org.apache.spark.sql.Row"
-//    case _ => "String"
-//  }
+  private def dataTypeToClass(dataType: DataType): Class[_] = dataType match {
+    case _: ByteType => classOf[java.lang.Byte]
+    case _: ShortType => classOf[java.lang.Short]
+    case _: IntegerType => classOf[java.lang.Integer]
+    case _: LongType => classOf[java.lang.Long]
+    case _: FloatType => classOf[java.lang.Float]
+    case _: DoubleType => classOf[java.lang.Double]
+    case _: DecimalType => classOf[java.math.BigDecimal]
+    case _: StringType => classOf[java.lang.String]
+    case _: BinaryType => classOf[Array[Byte]]
+    case _: BooleanType => classOf[java.lang.Boolean]
+    case _: TimestampType => classOf[java.sql.Timestamp]
+    case _: DateType => classOf[java.sql.Date]
+    case _: ArrayType => Class.forName("java.util.List")
+    case _: MapType => Class.forName("java.util.Map")
+    case _: StructType => classOf[org.apache.spark.sql.Row]
+    case _ => classOf[java.lang.String]
+  }
 
 }
