@@ -23,10 +23,8 @@ import com.j_spaces.core.client.SQLQuery
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SaveMode._
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.{InternalRow, ScalaReflection}
 import org.apache.spark.sql.insightedge.{DataFrameSchema, InsightEdgeSourceOptions}
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.types.CalendarInterval
 import org.insightedge.spark.implicits.basic._
 import org.insightedge.spark.rdd.InsightEdgeDocumentRDD
 
@@ -73,24 +71,8 @@ private[insightedge] case class InsightEdgeDocumentRelation(
       gs.clear(new SpaceDocument(collection))
     }
 
-    def javaBoxedType(dt: DataType): Class[_] = dt match {
-      case _: DecimalType => classOf[Decimal]
-      case BinaryType => classOf[Array[Byte]]
-      case StringType => classOf[String]
-      case CalendarIntervalType => classOf[CalendarInterval]
-      case _: StructType => classOf[InternalRow]
-      case _: ArrayType => classOf[ArrayType]
-      case _: MapType => classOf[MapType]
-      case udt: UserDefinedType[_] => javaBoxedType(udt.sqlType)
-      case ObjectType(cls) => cls
-      case _ => ScalaReflection.typeBoxedJavaMapping.getOrElse(dt, classOf[java.lang.Object])
-    }
-    // TODO| turning Date to Integer makes a difference between DF read from POJO and DF read from Dataframe in space.
-    // TODO|(one has integer the other has Date and in addition it pulls Date from space but trying to cast it into an Integer!
-
     val attributes = data.schema.toAttributes
-    val useDataFrameSchema = attributes.exists(attribute => isStructType(attribute.dataType))
-    val properties: Map[String, Class[_]] = attributes.map(field => field.name -> javaBoxedType(field.dataType)).toMap
+    val properties: Map[String, Class[_]] = attributes.map(field => field.name -> dataTypeToClass(field.dataType)).toMap
 
     if (gs.getTypeManager.getTypeDescriptor(collection) == null) {
       val spaceTypeDescriptorBuilder = new SpaceTypeDescriptorBuilder(collection)
@@ -108,20 +90,18 @@ private[insightedge] case class InsightEdgeDocumentRelation(
       })
     }.saveToGrid()
 
-
-    if (useDataFrameSchema) {
-      def removeMetadata(structType: StructType): StructType = {
-        StructType(structType.fields.map { structField =>
-          structField.copy(metadata = Metadata.empty, dataType = structField.dataType match {
-            case dt: StructType => removeMetadata(dt)
-            case dt => dt
-          })
+    // Write the Schema to space using DataFrameSchema
+    def removeMetadata(structType: StructType): StructType = {
+      StructType(structType.fields.map { structField =>
+        structField.copy(metadata = Metadata.empty, dataType = structField.dataType match {
+          case dt: StructType => removeMetadata(dt)
+          case dt => dt
         })
-      }
-
-      val metalessSchema = removeMetadata(schema)
-      gs.write(new DataFrameSchema(collection, metalessSchema))
+      })
     }
+
+    val metalessSchema = removeMetadata(schema)
+    gs.write(new DataFrameSchema(collection, metalessSchema))
   }
 
   override def insert(data: DataFrame, mode: SaveMode): Unit = {
@@ -164,11 +144,6 @@ private[insightedge] case class InsightEdgeDocumentRelation(
     val rdd = new InsightEdgeDocumentRDD(ieConfig, sc, collection, query, params, fields.toSeq, options.readBufferSize)
 
     rdd.mapPartitions { data => InsightEdgeAbstractRelation.beansToRows(data, clazzName, schema, fields) }
-  }
-
-  private def isStructType(dataType: DataType): Boolean = dataType match {
-    case _: StructType => true
-    case _ => false
   }
 
   private def dataTypeToClass(dataType: DataType): Class[_] = dataType match {

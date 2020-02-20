@@ -17,16 +17,14 @@
 package org.apache.spark.sql.insightedge.dataframe
 
 import java.sql.{Date, Timestamp}
-import java.text.{ParsePosition, SimpleDateFormat}
+import java.util
 
 import com.gigaspaces.document.SpaceDocument
 import com.j_spaces.core.client.SQLQuery
-import com.j_spaces.jdbc.QueryProcessor
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.insightedge.JSpatialData
 import org.apache.spark.sql.insightedge.model.{AllClassesSupport, Location, SpatialData, SpatialEmbeddedData}
-import org.apache.spark.unsafe.types.CalendarInterval
 import org.insightedge.spark.fixture.InsightEdge
 import org.insightedge.spark.implicits.all._
 import org.insightedge.spark.utils.{JavaSpaceClass, ScalaSpaceClass}
@@ -72,6 +70,7 @@ class DataFrameSpatialSpec extends fixture.FlatSpec with InsightEdge {
       assert(df.filter(df("point") geoWithin rectangle(-2, 2, -2, 2)).count() == 1)
       assert(df.filter(df("point") geoWithin rectangle(2, 4, -2, 2)).count() == 0)
     }
+
     val spark = ie.spark
     // pushed down to XAP
     val df = spark.read.grid[SpatialData]
@@ -96,44 +95,56 @@ class DataFrameSpatialSpec extends fixture.FlatSpec with InsightEdge {
     zeroPointCheck(pdf, "point")
   }
 
-  ignore should "dataframe: support more types." taggedAs ScalaSpaceClass in { ie => // TODO: add support
-    val timestamp = System.currentTimeMillis()
+  it should "dataframe: support more types." taggedAs ScalaSpaceClass in { ie =>
     val bigDecimal = new java.math.BigDecimal(42)
+    val intArray = Array(6, 8, 4)
+    val intScalaList = List(6, 8, 4)
     val array = Array[Byte](25.toByte, 66.toByte)
+    val intJavaList = util.Arrays.asList(Integer.valueOf(6), Integer.valueOf(6), Integer.valueOf(6))
+    val strJavaList = util.Arrays.asList("a", "B", "c")
+    val strJavaList2 = util.Arrays.asList("a", "y", "c")
 
     val date = Date.valueOf("2006-11-12")
     ie.spaceProxy.writeMultiple(Array(
-      AllClassesSupport("first", 6, bigDecimal, array, new Timestamp(777), date)
-      ,AllClassesSupport("second",6, bigDecimal, array, new Timestamp(999), date)
-      ,AllClassesSupport("third",6, bigDecimal, array, new Timestamp(777), date)
-      ))
+      AllClassesSupport("first", 6, bigDecimal, array, new Timestamp(777), date, intArray, intScalaList, intJavaList, strJavaList)
+      , AllClassesSupport("second", 6, bigDecimal, array, new Timestamp(999), date, intArray, intScalaList, intJavaList, strJavaList2)
+      , AllClassesSupport("third", 6, bigDecimal, array, new Timestamp(777), date, intArray, intScalaList, intJavaList, strJavaList2)
+    ))
 
     val spark = ie.spark
     val regularDataFrame = spark.read.grid[AllClassesSupport]
-
     regularDataFrame.write.grid("collection")
     val dataFrameFromSpace = spark.read.grid("collection")
+
     regularDataFrame.printSchema()
     dataFrameFromSpace.printSchema()
-    println(regularDataFrame.dtypes.equals(dataFrameFromSpace.dtypes))
-    println(regularDataFrame.dtypes)
-    println(dataFrameFromSpace.dtypes)
 
     regularDataFrame.show()
     dataFrameFromSpace.show()
-    dataFrameFromSpace.count()
 
-    assert(regularDataFrame.filter(regularDataFrame("decimal") equalTo BigDecimal.valueOf(42)).count() == 2)
-    assert(dataFrameFromSpace.filter(dataFrameFromSpace("decimal") equalTo bigDecimal).count() == 2)
+    assert(regularDataFrame.filter(row => row.getAs[java.math.BigDecimal]("decimal1").compareTo(bigDecimal) == 0).count() == 3)
+    assert(dataFrameFromSpace.filter(row => row.getAs[java.math.BigDecimal]("decimal1").compareTo(bigDecimal) == 0).count() == 3)
 
-    assert(regularDataFrame.filter(regularDataFrame("byte") equalTo array).count() == 3)
-    assert(dataFrameFromSpace.filter(dataFrameFromSpace("byte") equalTo  array).count() == 3)
+    assert(regularDataFrame.filter(row => row.getAs[Array[Byte]]("byte1").sameElements(array)).count() == 3)
+    assert(dataFrameFromSpace.filter(row => row.getAs[Array[Byte]]("byte1").sameElements(array)).count() == 3)
 
-    assert(regularDataFrame.filter(regularDataFrame("timeStamp") equalTo new Timestamp(999)).count() == 1)
-    assert(dataFrameFromSpace.filter(dataFrameFromSpace("timeStamp") equalTo new Timestamp(999)).count() == 1)
+    assert(regularDataFrame.filter(row => row.getAs[Seq[Int]]("arrInt").sameElements(intArray)).count() == 3)
+    assert(dataFrameFromSpace.filter(row => row.getAs[Seq[Int]]("arrInt").sameElements(intArray)).count() == 3)
 
-    assert(regularDataFrame.filter(regularDataFrame("date") equalTo new Date(timestamp)).count() == 0)
-    assert(dataFrameFromSpace.filter(dataFrameFromSpace("date") equalTo new Date(timestamp)).count() == 0)
+    assert(regularDataFrame.filter(row => row.getAs[Seq[Int]]("list1").sameElements(intScalaList)).count() == 3)
+    assert(dataFrameFromSpace.filter(row => row.getAs[Seq[Int]]("list1").sameElements(intScalaList)).count() == 3)
+
+    assert(regularDataFrame.filter(row => row.getAs[Seq[Integer]]("list2").sameElements(intJavaList.toArray)).count() == 3)
+    assert(dataFrameFromSpace.filter(row => row.getAs[Seq[Integer]]("list2").sameElements(intJavaList.toArray)).count() == 3)
+
+    assert(regularDataFrame.filter(row => row.getAs[Seq[String]]("listString").sameElements(strJavaList2.toArray)).count() == 2)
+    assert(dataFrameFromSpace.filter(row => row.getAs[Seq[String]]("listString").sameElements(strJavaList2.toArray)).count() == 2)
+
+    assert(regularDataFrame.filter(regularDataFrame("timeStamp1") equalTo new Timestamp(999)).count() == 1)
+    assert(dataFrameFromSpace.filter(dataFrameFromSpace("timeStamp1") equalTo new Timestamp(999)).count() == 1)
+
+    assert(regularDataFrame.filter(regularDataFrame("date1") equalTo date).count() == 3)
+    assert(dataFrameFromSpace.filter(dataFrameFromSpace("date1") equalTo date).count() == 3)
   }
 
   it should "dataframe: work with shapes embedded on second level" taggedAs ScalaSpaceClass in { ie =>
