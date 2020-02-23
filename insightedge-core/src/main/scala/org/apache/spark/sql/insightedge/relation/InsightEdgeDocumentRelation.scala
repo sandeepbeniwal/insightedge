@@ -35,14 +35,9 @@ private[insightedge] case class InsightEdgeDocumentRelation(
                                                           )
   extends InsightEdgeAbstractRelation(context, options) with Serializable {
 
-  private[this] val DATAFRAME_ID_PROPERTY = "i9e_DfId"
+  private[this] val DATAFRAME_ID_PROPERTY = "I9E_DFID"
 
   lazy val inferredSchema: StructType = {
-    /**
-     * We use DataframeSchema to save the schema of the DF because we don't support nested schema in our type descriptor.
-     * Therefore when we want to save Dataframe with nested properties and read it back later we'll use DataframeSchema
-     * When we won't use nested properties, we will use the getStructType which is using the type descriptor.
-     */
     gs.read[DataFrameSchema](new IdQuery(classOf[DataFrameSchema], collection)) match {
       case null => getStructType(collection)
       case storedSchema => storedSchema.schema
